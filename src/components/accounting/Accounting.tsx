@@ -21,11 +21,11 @@ const Accounting: React.FC = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-const [confirmInfo, setConfirmInfo] = useState<{
-  title: string;
-  description: string;
-  onConfirm: () => void;
-} | null>(null);
+  const [confirmInfo, setConfirmInfo] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -117,6 +117,48 @@ const [confirmInfo, setConfirmInfo] = useState<{
     }).format(amount);
   };
 
+  const updateWalletBalance = async (walletId: string, amount: number, isIncome: boolean) => {
+    const { data: wallet, error: fetchError } = await supabase
+      .from('e_wallets')
+      .select('balance')
+      .eq('id', walletId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const newBalance = isIncome 
+      ? wallet.balance + amount 
+      : wallet.balance - amount;
+
+    const { error: updateError } = await supabase
+      .from('e_wallets')
+      .update({ balance: newBalance, updated_at: new Date().toISOString() })
+      .eq('id', walletId);
+
+    if (updateError) throw updateError;
+  };
+
+  const updateThemeSpending = async (themeId: string, amount: number, isAdd: boolean) => {
+    const { data: theme, error: fetchError } = await supabase
+      .from('themes')
+      .select('current_spent')
+      .eq('id', themeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const newSpent = isAdd 
+      ? theme.current_spent + amount 
+      : theme.current_spent - amount;
+
+    const { error: updateError } = await supabase
+      .from('themes')
+      .update({ current_spent: Math.max(0, newSpent), updated_at: new Date().toISOString() })
+      .eq('id', themeId);
+
+    if (updateError) throw updateError;
+  };
+
   const handleDeleteEWallet = async (id: string) => {
     const loadingToast = toast.loading('Menghapus e-wallet...');
     
@@ -161,35 +203,55 @@ const [confirmInfo, setConfirmInfo] = useState<{
     const loadingToast = toast.loading('Menghapus transaksi...');
     
     try {
+      // Ambil data transaksi yang akan dihapus
+      const { data: transaction, error: fetchError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Hapus transaksi
       const { error } = await supabase
         .from('transactions')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+
+      // Kembalikan saldo dan tema
+      if (transaction.type === 'income') {
+        await updateWalletBalance(transaction.e_wallet_id, transaction.amount, false);
+      } else {
+        await updateWalletBalance(transaction.e_wallet_id, transaction.amount, true);
+        if (transaction.theme_id) {
+          await updateThemeSpending(transaction.theme_id, transaction.amount, false);
+        }
+      }
       
       toast.dismiss(loadingToast);
       toast.success('Transaksi berhasil dihapus!');
       fetchTransactions();
       fetchData(); // Refresh wallet balances
+      fetchThemes(); // Refresh theme spending
     } catch (error: any) {
       toast.dismiss(loadingToast);
       toast.error(`Gagal menghapus transaksi: ${error.message}`);
     }
   };
 
- const confirmDelete = (type: string, name: string, deleteFunction: () => void) => {
-  setConfirmInfo({
-    title: `Hapus ${type}?`,
-    description: `Apakah Anda yakin ingin menghapus ${type} "${name}"? Tindakan ini tidak bisa dibatalkan.`,
-    onConfirm: () => {
-      deleteFunction();
-      setShowConfirmModal(false);
-    },
-  });
-  setShowConfirmModal(true);
-};
-
+  const confirmDelete = (type: string, name: string, deleteFunction: () => void) => {
+    setConfirmInfo({
+      title: `Hapus ${type}?`,
+      description: `Apakah Anda yakin ingin menghapus ${type} "${name}"? Tindakan ini tidak dapat dibatalkan.`,
+      onConfirm: () => {
+        deleteFunction();
+        setShowConfirmModal(false);
+      },
+    });
+    setShowConfirmModal(true);
+  };
 
   if (loading) {
     return (
@@ -203,7 +265,7 @@ const [confirmInfo, setConfirmInfo] = useState<{
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Accounting
+          Akuntansi
         </h1>
       </div>
 
@@ -350,7 +412,7 @@ const [confirmInfo, setConfirmInfo] = useState<{
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Budget: {formatCurrency(theme.max_budget)}
+                      Anggaran: {formatCurrency(theme.max_budget)}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
                       Terpakai: {formatCurrency(theme.current_spent)}
@@ -390,7 +452,7 @@ const [confirmInfo, setConfirmInfo] = useState<{
                       Deskripsi
                     </th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
-                      Tipe
+                      Jenis
                     </th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
                       Jumlah
@@ -508,6 +570,7 @@ const [confirmInfo, setConfirmInfo] = useState<{
           onSuccess={() => {
             fetchTransactions();
             fetchData();
+            fetchThemes();
             setShowTransactionForm(false);
             setEditingItem(null);
           }}
@@ -516,16 +579,16 @@ const [confirmInfo, setConfirmInfo] = useState<{
           themes={themes}
         />
       )}
-      {confirmInfo && (
-  <ConfirmModal
-    isOpen={showConfirmModal}
-    title={confirmInfo.title}
-    description={confirmInfo.description}
-    onCancel={() => setShowConfirmModal(false)}
-    onConfirm={confirmInfo.onConfirm}
-  />
-)}
 
+      {confirmInfo && (
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          title={confirmInfo.title}
+          description={confirmInfo.description}
+          onCancel={() => setShowConfirmModal(false)}
+          onConfirm={confirmInfo.onConfirm}
+        />
+      )}
     </div>
   );
 };

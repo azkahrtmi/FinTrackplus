@@ -139,9 +139,8 @@ const Dashboard: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Dashboard
+          Dasbor
         </h1>
-     
       </div>
 
       {/* Stats Cards */}
@@ -233,7 +232,7 @@ const Dashboard: React.FC = () => {
       {/* Chart */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-slate-700">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          Pengeluaran
+          Pengeluaran Berdasarkan Tema
         </h2>
         <div className="h-96 flex items-center justify-center">
           {getChartData().labels.length > 0 ? (

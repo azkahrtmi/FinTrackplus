@@ -37,7 +37,7 @@ const ThemeForm: React.FC<ThemeFormProps> = ({
     setLoading(true);
 
     const loadingToast = toast.loading(
-      editingItem ? 'Mengupdate tema...' : 'Membuat tema...'
+      editingItem ? 'Memperbarui tema...' : 'Membuat tema...'
     );
 
     try {
@@ -57,7 +57,7 @@ const ThemeForm: React.FC<ThemeFormProps> = ({
         if (error) throw error;
         
         toast.dismiss(loadingToast);
-        toast.success('Tema berhasil diupdate!');
+        toast.success('Tema berhasil diperbarui!');
       } else {
         const { error } = await supabase
           .from('themes')
@@ -76,7 +76,7 @@ const ThemeForm: React.FC<ThemeFormProps> = ({
       onSuccess();
     } catch (error: any) {
       toast.dismiss(loadingToast);
-      toast.error(`Gagal ${editingItem ? 'mengupdate' : 'membuat'} tema: ${error.message}`);
+      toast.error(`Gagal ${editingItem ? 'memperbarui' : 'membuat'} tema: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ const ThemeForm: React.FC<ThemeFormProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Budget Maksimal
+                Anggaran Maksimal
               </label>
               <input
                 type="number"
@@ -126,7 +126,7 @@ const ThemeForm: React.FC<ThemeFormProps> = ({
                 className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:bg-slate-700 dark:text-white"
                 placeholder="0"
                 min="0"
-                step="1000"
+                step="any"
                 required
               />
             </div>
@@ -145,7 +145,7 @@ const ThemeForm: React.FC<ThemeFormProps> = ({
               disabled={loading}
               className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {loading ? 'Menyimpan...' : editingItem ? 'Update' : 'Simpan'}
+              {loading ? 'Menyimpan...' : editingItem ? 'Perbarui' : 'Simpan'}
             </button>
           </div>
         </form>

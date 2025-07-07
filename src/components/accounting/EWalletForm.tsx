@@ -57,7 +57,7 @@ const EWalletForm: React.FC<EWalletFormProps> = ({
         if (error) throw error;
         
         toast.dismiss(loadingToast);
-        toast.success('E-wallet berhasil diupdate!');
+        toast.success('E-wallet berhasil diperbarui!');
       } else {
         const { error } = await supabase
           .from('e_wallets')
@@ -75,7 +75,7 @@ const EWalletForm: React.FC<EWalletFormProps> = ({
       onSuccess();
     } catch (error: any) {
       toast.dismiss(loadingToast);
-      toast.error(`Gagal ${editingItem ? 'mengupdate' : 'membuat'} e-wallet: ${error.message}`);
+      toast.error(`Gagal ${editingItem ? 'memperbarui' : 'membuat'} e-wallet: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ const EWalletForm: React.FC<EWalletFormProps> = ({
                 className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:bg-slate-700 dark:text-white"
                 placeholder="0"
                 min="0"
-                step="1000"
+                step="any"
               />
             </div>
           </div>
@@ -143,7 +143,7 @@ const EWalletForm: React.FC<EWalletFormProps> = ({
               disabled={loading}
               className="flex-1 px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {loading ? 'Menyimpan...' : editingItem ? 'Update' : 'Simpan'}
+              {loading ? 'Menyimpan...' : editingItem ? 'Perbarui' : 'Simpan'}
             </button>
           </div>
         </form>

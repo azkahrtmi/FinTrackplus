@@ -40,12 +40,54 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [editingItem]);
 
+  const updateWalletBalance = async (walletId: string, amount: number, isIncome: boolean) => {
+    const { data: wallet, error: fetchError } = await supabase
+      .from('e_wallets')
+      .select('balance')
+      .eq('id', walletId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const newBalance = isIncome 
+      ? wallet.balance + amount 
+      : wallet.balance - amount;
+
+    const { error: updateError } = await supabase
+      .from('e_wallets')
+      .update({ balance: newBalance, updated_at: new Date().toISOString() })
+      .eq('id', walletId);
+
+    if (updateError) throw updateError;
+  };
+
+  const updateThemeSpending = async (themeId: string, amount: number, isAdd: boolean) => {
+    const { data: theme, error: fetchError } = await supabase
+      .from('themes')
+      .select('current_spent')
+      .eq('id', themeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const newSpent = isAdd 
+      ? theme.current_spent + amount 
+      : theme.current_spent - amount;
+
+    const { error: updateError } = await supabase
+      .from('themes')
+      .update({ current_spent: Math.max(0, newSpent), updated_at: new Date().toISOString() })
+      .eq('id', themeId);
+
+    if (updateError) throw updateError;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     const loadingToast = toast.loading(
-      editingItem ? 'Mengupdate transaksi...' : 'Membuat transaksi...'
+      editingItem ? 'Memperbarui transaksi...' : 'Membuat transaksi...'
     );
 
     try {
@@ -61,7 +103,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       };
 
       if (editingItem) {
-        // Update transaction
+        // Kembalikan nilai lama terlebih dahulu
+        if (editingItem.type === 'income') {
+          await updateWalletBalance(eWalletId, editingItem.amount, false);
+        } else {
+          await updateWalletBalance(eWalletId, editingItem.amount, true);
+          if (editingItem.theme_id) {
+            await updateThemeSpending(editingItem.theme_id, editingItem.amount, false);
+          }
+        }
+
+        // Update transaksi
         const { error } = await supabase
           .from('transactions')
           .update(transactionData)
@@ -69,29 +121,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         if (error) throw error;
 
-        // Update theme current_spent and wallet balance
-        if (type === 'expense' && themeId) {
-          const { error: themeError } = await supabase.rpc('update_theme_spending', {
-            theme_id: themeId,
-            old_amount: editingItem.amount,
-            new_amount: transactionAmount
-          });
-          if (themeError) throw themeError;
+        // Terapkan nilai baru
+        if (type === 'income') {
+          await updateWalletBalance(eWalletId, transactionAmount, true);
+        } else {
+          await updateWalletBalance(eWalletId, transactionAmount, false);
+          if (themeId) {
+            await updateThemeSpending(themeId, transactionAmount, true);
+          }
         }
-
-        const { error: walletError } = await supabase.rpc('update_wallet_balance', {
-          wallet_id: eWalletId,
-          old_amount: editingItem.amount,
-          old_type: editingItem.type,
-          new_amount: transactionAmount,
-          new_type: type
-        });
-        if (walletError) throw walletError;
         
         toast.dismiss(loadingToast);
-        toast.success('Transaksi berhasil diupdate!');
+        toast.success('Transaksi berhasil diperbarui!');
       } else {
-        // Create new transaction
+        // Buat transaksi baru
         const { error } = await supabase
           .from('transactions')
           .insert([{
@@ -101,21 +144,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         if (error) throw error;
 
-        // Update theme current_spent
-        if (type === 'expense' && themeId) {
-          const { error: themeError } = await supabase.rpc('increment_theme_spending', {
-            theme_id: themeId,
-            amount: transactionAmount
-          });
-          if (themeError) throw themeError;
+        // Update saldo dan tema
+        if (type === 'income') {
+          await updateWalletBalance(eWalletId, transactionAmount, true);
+        } else {
+          await updateWalletBalance(eWalletId, transactionAmount, false);
+          if (themeId) {
+            await updateThemeSpending(themeId, transactionAmount, true);
+          }
         }
-
-        // Update wallet balance
-        const { error: walletError } = await supabase.rpc('update_wallet_balance_simple', {
-          wallet_id: eWalletId,
-          amount: type === 'income' ? transactionAmount : -transactionAmount
-        });
-        if (walletError) throw walletError;
         
         toast.dismiss(loadingToast);
         toast.success('Transaksi berhasil dibuat!');
@@ -124,7 +161,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       onSuccess();
     } catch (error: any) {
       toast.dismiss(loadingToast);
-      toast.error(`Gagal ${editingItem ? 'mengupdate' : 'membuat'} transaksi: ${error.message}`);
+      toast.error(`Gagal ${editingItem ? 'memperbarui' : 'membuat'} transaksi: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -174,14 +211,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:bg-slate-700 dark:text-white"
                 placeholder="0"
                 min="0"
-                step="1000"
+                step="any"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Tipe
+                Jenis
               </label>
               <select
                 value={type}
@@ -233,7 +270,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               disabled={loading}
               className="flex-1 px-4 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {loading ? 'Menyimpan...' : editingItem ? 'Update' : 'Simpan'}
+              {loading ? 'Menyimpan...' : editingItem ? 'Perbarui' : 'Simpan'}
             </button>
           </div>
         </form>
